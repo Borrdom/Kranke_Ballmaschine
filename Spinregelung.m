@@ -1,8 +1,15 @@
 clear % clear workspace
 close all % close all figures
 
-Winkel = 330; % Winkel angeben
+Winkel = 1130; % Winkel angeben
+Winkel = Winkel - 360 * (Winkel / 360 - mod(Winkel / 360, 1)); % Winkel auf maximal 360° begrenzen
 Radius = 0.8; % Radius angeben
+if Radius > 1 % Radius auf maximal 1 begrenzen
+    
+    Radius = 1;
+    
+end % if
+
 Leistung = 1; % Leistung angeben (erstmal nicht gebraucht)
 
 x0 = Radius * sin(Winkel * pi() / 180); % in x Koordinate umrechnen (die Daten bekommt man)
