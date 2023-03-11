@@ -1,9 +1,9 @@
 clear % clear workspace
 close all % close all figures
 
-Winkel = 1130; % Winkel angeben
+Winkel = 1160; % Winkel angeben
 Winkel = Winkel - 360 * (Winkel / 360 - mod(Winkel / 360, 1)); % Winkel auf maximal 360° begrenzen
-Radius = 0.8; % Radius angeben
+Radius = 1.3; % Radius angeben
 if Radius > 1 % Radius auf maximal 1 begrenzen
     
     Radius = 1;
@@ -39,21 +39,25 @@ if alpha0 >= 0 && alpha0 < 120 % Zwischen Motor A und B
 
     w_A = 0.5 + 0.5 * cos((1.5 * (alpha0 - 0)) * pi() / 180); % Anteil Motor A bei r = r_max
     w_B = 0.5 + 0.5 * cos((1.5 * (alpha0 - 120)) * pi() / 180); % Anteil Motor B bei r = r_max
-    w_C = 1 - w_A - w_B; % Anteil Motor Cbei r = r_max
+    w_C = max(0, 1 - w_A - w_B); % Anteil Motor Cbei r = r_max
 
 elseif alpha0 >= 120 && alpha0 < 240 % Zwischen Motor B und C
 
     w_B = 0.5 + 0.5 * cos((1.5 * (alpha0 - 120)) * pi() / 180); % Anteil Motor B bei r = r_max
     w_C = 0.5 + 0.5 * cos((1.5 * (alpha0 - 240)) * pi() / 180); % Anteil Motor C bei r = r_max
-    w_A = 1 - w_B - w_C; % Anteil Motor A bei r = r_max
+    w_A = max(0, 1 - w_B - w_C); % Anteil Motor A bei r = r_max
 
 else  % Zwischen Motor C und A
 
     w_A = 0.5 + 0.5 * cos((1.5 * (alpha0 - 360)) * pi() / 180); % Anteil Motor A bei r = r_max
     w_C = 0.5 + 0.5 * cos((1.5 * (alpha0 - 240)) * pi() / 180); % Anteil Motor C bei r = r_max
-    w_B = 1 - w_A - w_C; % Anteil Motor B bei r = r_max
+    w_B = max(0, 1 - w_A - w_C); % Anteil Motor B bei r = r_max
 
 end % if
+
+w_A = w_A / (w_A + w_B + w_C);
+w_B = w_B / (w_A + w_B + w_C);
+w_C = w_C / (w_A + w_B + w_C);
 
 w_A = (w_A - 1 / 3) * r_i + 1 / 3; % Anteil Motor A bei r = r_i
 w_B = (w_B - 1 / 3) * r_i + 1 / 3; % Anteil Motor B bei r = r_i
