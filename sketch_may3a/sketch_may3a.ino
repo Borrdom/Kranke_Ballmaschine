@@ -1,7 +1,7 @@
 // Pins für Motoren und Hall Sensoren
 //Motor A
 int GSMA = 9;  // PWM
-int hallPinA = 10; 
+int hallPinA = 2; 
 //Motor B
 int GSMB = 6;
 int hallPinB = 11; 
@@ -65,16 +65,26 @@ float speedA = 1000.;
 float speedB = 1000.;
 float speedC = 1000.;
 
-int nMess = 3;
+int nMess = 6;
 int delta;
 int pwmtest;
 int evaltest= 100;
 int eval= 100;
 
+int readyA=0;
+int readyB=0;
+int readyC=0;
+
+int pwmthreshA=pwmthresh;
+int pwmthreshB=pwmthresh;
+int pwmthreshC=pwmthresh;
+volatile int valA=0;
+
+volatile long umdrehungenZeit;
+unsigned long letzteUmdrehungZeit;
 
 void setup()
 {
-  
   Serial.begin(9600);  //serieller Monitor wird gestartet, Baudrate auf 9600 festgelegt
   //Motor 1
   pinMode(GSMA, OUTPUT);  
@@ -83,46 +93,88 @@ void setup()
   //Motor 3
   pinMode(GSMC, OUTPUT);  
   // Hall Sensiór 1
-  pinMode(hallPinA,INPUT);
+  // pinMode(hallPinA,INPUT);
   // Hall Sensiór 2
   pinMode(hallPinB,INPUT);
   // Hall Sensiór 3
   pinMode(hallPinC,INPUT);
 
+  pinMode(hallPinA,INPUT_PULLUP);
+
   analogWrite(GSMA, pwmthresh);
   analogWrite(GSMB, pwmthresh);
   analogWrite(GSMC, pwmthresh);
-  spannung= get_voltage(spannung);
+  // spannung= get_voltage(spannung);
 
-  maxspeedA=motorkurve(mA,spannung);
-  maxspeedB=motorkurve(mB,spannung);
-  maxspeedC=motorkurve(mC,spannung);
+  // maxspeedA=motorkurve(mA,spannung);
+  // maxspeedB=motorkurve(mB,spannung);
+  // maxspeedC=motorkurve(mC,spannung);
+  attachInterrupt(digitalPinToInterrupt(hallPinA), PENIS, FALLING && RISING);
 
   scale=maxspeedA/80.;
-  pwmthresh=1.2/spannung*255;
-
+  // pwmthresh=1.2/spannung*255;
   delta = floor((255.-pwmthresh)/(nMess+1.));
 
-  for (int i = 1; i < nMess+1; i+=1){
-  pwmtest=floor(pwmthresh+delta*i);
-  analogWrite(GSMA,pwmtest);
-  analogWrite(GSMB,pwmtest);
-  analogWrite(GSMC,pwmtest);
-  delay(2000);
-  speedA=get_speed(hallPinA,speedA,evaltest);
-  speedB=get_speed(hallPinB,speedB,evaltest);
-  speedC=get_speed(hallPinC,speedC,evaltest);
-  pwmparamA=(pwmparamA*(float(i-1))-(pwmtest-pwmthresh)/log(1-speedA/maxspeedA))/float(i);
-  Serial.println(pwmtest);
-  Serial.println(maxspeedA);
-  Serial.println(speedB);
-  pwmparamB=(pwmparamB*(float(i-1))-(pwmtest-pwmthresh)/log(1-speedB/maxspeedB))/float(i);
-  pwmparamC=(pwmparamC*(float(i-1))-(pwmtest-pwmthresh)/log(1-speedC/maxspeedC))/float(i);
-  // Serial.println(pwmparamA);
-  // Serial.println(pwmparamB);
-  // Serial.println(pwmparamC);
+  for (int i = pwmthresh+delta; i > 0; i-=1){
+    analogWrite(GSMA,i);
+    analogWrite(GSMB,i);
+    analogWrite(GSMC,i);
+    if (readyA==0){ if ( not when_on(hallPinA) ) { pwmthreshA=i; readyA=1;};}
+    if (readyB==0){ if ( not when_on(hallPinB) ) { pwmthreshB=i; readyB=1;};}
+    if (readyC==0){ if ( not when_on(hallPinC) ) { pwmthreshC=i; readyC=1;};}
+    if ((readyA + readyB + readyC)==3){break;}
+    
   }
-  
+    Serial.println(pwmthreshA);
+    Serial.println(pwmthreshB);
+    Serial.println(pwmthreshC);
+
+  // pwmthreshA=24;
+  // pwmthreshB=31;
+  // pwmthreshC=23;
+
+    analogWrite(GSMA,255);
+    analogWrite(GSMB,255);
+    analogWrite(GSMC,255);
+    delay(2000);
+    maxspeedA=get_speed(hallPinA,speedA,450);
+    maxspeedB=get_speed(hallPinB,speedB,450);
+    maxspeedC=get_speed(hallPinC,speedC,450);
+
+    Serial.println("+++");
+    Serial.println(maxspeedA);
+    Serial.println(maxspeedB);
+    Serial.println(maxspeedC);
+    Serial.println("+++");
+
+  for (int i = 1; i < nMess+1; i+=1){
+    pwmtest=floor(255-delta*i);
+    Serial.println(pwmtest);
+    analogWrite(GSMA,pwmtest);
+    analogWrite(GSMB,pwmtest);
+    analogWrite(GSMC,pwmtest);
+    delay(2000);
+    speedA=get_speed(hallPinA,speedA,evaltest);
+    speedB=get_speed(hallPinB,speedB,evaltest);
+    speedC=get_speed(hallPinC,speedC,evaltest);
+    while (speedA>maxspeedA){speedA=get_speed(hallPinA,speedA,evaltest);}
+    while (speedB>maxspeedB){speedB=get_speed(hallPinB,speedB,evaltest);}
+    while (speedC>maxspeedC){speedC=get_speed(hallPinC,speedC,evaltest);}
+
+    // Serial.println(-(pwmtest-pwmthreshA)/log(1-speedA/maxspeedA));
+    // Serial.println(-(pwmtest-pwmthreshB)/log(1-speedB/maxspeedB));
+    // Serial.println(-(pwmtest-pwmthreshC)/log(1-speedC/maxspeedC));
+
+    pwmparamA=(pwmparamA*(float(i-1))-(pwmtest-pwmthreshA)/log(1-speedA/maxspeedA))/float(i);
+    pwmparamB=(pwmparamB*(float(i-1))-(pwmtest-pwmthreshB)/log(1-speedB/maxspeedB))/float(i);
+    pwmparamC=(pwmparamC*(float(i-1))-(pwmtest-pwmthreshC)/log(1-speedC/maxspeedC))/float(i);
+
+
+    Serial.println(pwmparamA);
+    Serial.println(pwmparamB);
+    Serial.println(pwmparamC);
+  }
+
 
   
 
@@ -165,12 +217,12 @@ void loop(){
   // pwmparamA=speedregulation(speedA,sollspeedA,pwmparamA,KpA);
   
 
-  pwmA= pwm_func(sollspeedA, maxspeedA, pwmthresh,pwmparamA);
-  analogWrite(GSMA, max(min(pwmA,255),pwmthresh));
-  pwmB= pwm_func(sollspeedB, maxspeedB, pwmthresh,pwmparamB);
-  analogWrite(GSMB, max(min(pwmB,255),pwmthresh));
-  pwmC= pwm_func(sollspeedC, maxspeedC, pwmthresh,pwmparamC);
-  analogWrite(GSMC, max(min(pwmC,255),pwmthresh));
+  pwmA= pwm_func(sollspeedA, maxspeedA, pwmthreshA,pwmparamA);
+  analogWrite(GSMA, max(min(pwmA,255),pwmthreshA));
+  pwmB= pwm_func(sollspeedB, maxspeedB, pwmthreshB,pwmparamB);
+  analogWrite(GSMB, max(min(pwmB,255),pwmthreshB));
+  pwmC= pwm_func(sollspeedC, maxspeedC, pwmthreshC,pwmparamC);
+  analogWrite(GSMC, max(min(pwmC,255),pwmthreshC));
 
   delay(2000);
   speedA=get_speed(hallPinA,speedA,eval);
@@ -228,11 +280,11 @@ float get_speed(int hallPin, float speedold, int eval){
   int val=0;
   bool on_state=false;
   float speed = 0.;
-  float start = millis();
+  float start = micros();
   //digitalWrite(LED_BUILTIN,HIGH);
   while (val<eval){
     //digitalWrite(LED_BUILTIN,digitalRead(hallPin));
-    //if ((millis()-start)>700){break;}
+    //if ((micros()-start)>700){break;}
     if (digitalRead(hallPin)==0){
       if (on_state==false){
         on_state=true;
@@ -248,11 +300,62 @@ float get_speed(int hallPin, float speedold, int eval){
     }
   }
   
-  float stop = millis();
-  float time=(stop-start)/1000.;
+  float stop = micros();
+  float time=(stop-start)/1000000.;
   speed=val/time*60;
   return speed;
 }
+
+float get_speed_final(int hallPin, float speedold, int eval){
+
+
+  float speed = 0.;
+  // float start = micros();
+  umdrehungenZeit=micros();
+  letzteUmdrehungZeit=umdrehungenZeit;
+
+  //digitalWrite(LED_BUILTIN,HIGH);
+  valA=0;
+  while (valA<eval){
+  }
+  
+  // float stop = micros();
+  // float time=(stop-start)/1000000.;
+  float time=umdrehungenZeit/1000000.;
+  speed=valA/time*60;
+  return speed;
+}
+
+void PENIS(){
+  long now=micros();
+  valA++;
+  umdrehungenZeit+=(now-letzteUmdrehungZeit);
+  letzteUmdrehungZeit=now;
+  // Serial.println(val);
+}
+
+bool when_on(int hallPin){
+  int val=0;
+  bool on_state=false;
+  float start = micros();
+  while (true){
+    if ((micros()-start)>1000000){return false;}
+    if (val>2){return true;}
+    if (digitalRead(hallPin)==0){
+      if (on_state==false){
+        on_state=true;
+        val+=1;
+        start = micros();
+      }
+    }
+    else{
+      if (on_state==true){
+        on_state=false;
+      }      
+    }
+  }
+}
+
 
 float motorkurve( float m, float spannung){
   return spannung*m;
