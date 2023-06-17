@@ -1,186 +1,236 @@
-// Gleichstrommotoren
+// Pins für Motoren und Hall Sensoren
+//Motor A
+int GSMA = 9;  // PWM
+int hallPinA = 10; 
+//Motor B
+int GSMB = 6;
+int hallPinB = 11; 
+//Motor C
+int GSMC = 3;  // PWM
+int hallPinC = 12; 
 
-//Motor 1
-
-int GSM1 = 3;  // PWM
-int inr1 = 2;    // An aus Signal
-int inl1 = 4;    // An aus Signal
-//Motor 2
-int GSM2 = 5;  // PWM
-int inr2 = 6;    // An aus Signal
-int inl2 = 7;    // An aus Signal
-//Motor 3
-int GSM3 = 10;  // PWM
-int inr3 = 9;    // An aus Signal
-int inl3 = 8;    // An aus Signal
-
-int hallPinA = 11; // is C
-int hallPinB = 12; // is A
-int hallPinC = 13; // is B
-float starttime =millis();
-int i = 0.;
-
-
-// float pi = 3.1415926535897932384626433832795;
+// Spinfunktion
 float x0 = 0.;
 float y0 = 0.01;
-// float alpha0 = 0.;
-// float alpha_tilde = 0.;
-// float r_i = 0.;
 float w_A=0.;
 float w_B=0.;
 float w_C=0.;
-int P=0;
-float P0=45;
-
-
-int Signal = 0;
-float maxspeed = 10000.;
-float scalexy= 255./80.;
-float scale= maxspeed/80.;
 float w_max = 1.;
-float sollspeed = 3000.;
-float sollspeedA = 3000.;
-float sollspeedB = 3000.;
-float sollspeedC = 3000.;
-float cumerrA = 0.;
-float cumerrB = 0.;
-float cumerrC = 0.;
-float powerA = P0;
-float powerB = 0.;
-float powerC = 0.;
-float speedA = 3000.;
-float speedB = 3000.;
-float speedC = 3000.;
-float speedlimit=-1;
-float input_voltage = 0.0;
+float scalexy= 255./80.;
 
-String output="hello";
+//pwmfunktion
+int pwmthresh=45;
 
-///Parameters for Motor A
-float mA [3]={-0.009,3.5109,-3.0876};
-float bA [3]={0.0213,-5.8231,-989.72};
-///Parameters for Motor B
-float mB [3]={1.,1.,1.};
-float bB [3]={1.,1.,1.};
-///Parameters for Motor C
-float mC [3]={1.,1.,1.};
-float bC [3]={1.,1.,1.};
+float pwmA = pwmthresh;
+float pwmB = pwmthresh;
+float pwmC = pwmthresh;
 
-int spannungsmessungsPin;
+
+float mA =336.9398575;
+float mB =343.3361823;
+float mC =345.231468;
+
+
+float pwmparamA =0.1711*255.;
+
+float pwmparamB =0.1354*255.;
+
+float pwmparamC =0.1914*255.;
+
+
+float KpA =0.00006;
+float KpB =0.00006;
+float KpC =0.00006;
+
 float spannung;
-float cumsum=0.;
-int count=0;
+
+//Bluetooth
+int Signal = -1;
+bool bluetooth=false;
+
+// Drehzahlvariablen
+float maxspeed = 10000.;
+float maxspeedA = 1000.;
+float maxspeedB = 1000.;
+float maxspeedC = 1000.;
+
+float sollspeed = 1000.;
+float sollspeedA = 1000.;
+float sollspeedB = 1000.;
+float sollspeedC = 1000.;
+
+float scale= maxspeed/80.;
+
+float speedA = 1000.;
+float speedB = 1000.;
+float speedC = 1000.;
+
+int nMess = 3;
+int delta;
+int pwmtest;
+int evaltest= 100;
+int eval= 100;
 
 
 void setup()
 {
+  
   Serial.begin(9600);  //serieller Monitor wird gestartet, Baudrate auf 9600 festgelegt
-  //pinMode(LED_BUILTIN, OUTPUT);
-  //digitalWrite(LED_BUILTIN, LOW);
   //Motor 1
-  pinMode(GSM1, OUTPUT);  
-  pinMode(inr1, OUTPUT);
-  pinMode(inl1, OUTPUT);
-  digitalWrite(inr1, HIGH); 
-  digitalWrite(inl1, LOW); 
-  //Motor 1
-  pinMode(GSM2, OUTPUT);  
-  pinMode(inr2, OUTPUT);
-  pinMode(inl2, OUTPUT);
-  digitalWrite(inr2, LOW); 
-  digitalWrite(inl2, HIGH); 
+  pinMode(GSMA, OUTPUT);  
+  //Motor 2
+  pinMode(GSMB, OUTPUT);  
   //Motor 3
-  pinMode(GSM3, OUTPUT);  
-  pinMode(inr3, OUTPUT);
-  pinMode(inl3, OUTPUT);
-  digitalWrite(inr3, HIGH); 
-  digitalWrite(inl3, LOW); 
-  analogWrite(GSM1, P0);
-  analogWrite(GSM2, P0);
-  analogWrite(GSM3, P0);
+  pinMode(GSMC, OUTPUT);  
   // Hall Sensiór 1
-  pinMode(11,INPUT);
+  pinMode(hallPinA,INPUT);
   // Hall Sensiór 2
-  pinMode(12,INPUT);
+  pinMode(hallPinB,INPUT);
   // Hall Sensiór 3
-  pinMode(13,INPUT);
-  P0=255;
-  analogWrite(GSM1, P0);
-  analogWrite(GSM2, P0);
-  analogWrite(GSM3, P0);
-  // analogWrite(GSM2, 0);
-  // for (int i = P0; i < 255; i+=5) {
-  //   powerA=100;
-  //   analogWrite(GSM3, powerA);
-  //   delay(1000);
-  //   //analogWrite(GSM1, 0);
+  pinMode(hallPinC,INPUT);
 
-  //   speedA=get_speed(hallPinA,speedA);
-  //   output=String(powerA)+";"+String(speedA);
-  //   //Serial.println(output);
-    
-  // }
+  analogWrite(GSMA, pwmthresh);
+  analogWrite(GSMB, pwmthresh);
+  analogWrite(GSMC, pwmthresh);
+  spannung= get_voltage(spannung);
 
-  // det_power_speed_pair(50,GSM3,hallPinA,speedA);
+  maxspeedA=motorkurve(mA,spannung);
+  maxspeedB=motorkurve(mB,spannung);
+  maxspeedC=motorkurve(mC,spannung);
 
-  // for (int i = P0; i < 255; i+=5) {
-  //   det_power_speed_pair(i,GSM3,hallPinA,speedA);
-  // }
+  scale=maxspeedA/80.;
+  pwmthresh=1.2/spannung*255;
+
+  delta = floor((255.-pwmthresh)/(nMess+1.));
+
+  for (int i = 1; i < nMess+1; i+=1){
+  pwmtest=floor(pwmthresh+delta*i);
+  analogWrite(GSMA,pwmtest);
+  analogWrite(GSMB,pwmtest);
+  analogWrite(GSMC,pwmtest);
+  delay(2000);
+  speedA=get_speed(hallPinA,speedA,evaltest);
+  speedB=get_speed(hallPinB,speedB,evaltest);
+  speedC=get_speed(hallPinC,speedC,evaltest);
+  pwmparamA=(pwmparamA*(float(i-1))-(pwmtest-pwmthresh)/log(1-speedA/maxspeedA))/float(i);
+  Serial.println(pwmtest);
+  Serial.println(maxspeedA);
+  Serial.println(speedB);
+  pwmparamB=(pwmparamB*(float(i-1))-(pwmtest-pwmthresh)/log(1-speedB/maxspeedB))/float(i);
+  pwmparamC=(pwmparamC*(float(i-1))-(pwmtest-pwmthresh)/log(1-speedC/maxspeedC))/float(i);
+  // Serial.println(pwmparamA);
+  // Serial.println(pwmparamB);
+  // Serial.println(pwmparamC);
+  }
+  
+
+  
 
 }
 
 void loop(){
-  count++;
-// det_power_speed_pair(50,GSM3,hallPinA,speedA);
-// Serial.println(digitalRead(hallPinA));
-
-  //spannung=analogRead(spannungsmessungsPin)/1023.0*5.0;
-  //spannung=21.;
-
-  //speedA=get_speed(hallPinA,speedA);
-  //speedB=get_speed(hallPinB,speedB);
+  Serial.println("---");
+  //Serial.println(spannung);
+  delay(1000);
 
 
-  //speedC=get_speed(hallPinC,speedC);
-  //powerA=speed_polynomial(sollspeedA,mA,bA,spannung);
-  //powerB=speed_polynomial(sollspeedB,mB,bB,spannung);
-  //powerC=speed_polynomial(sollspeedC,mC,bC,spannung);
+  if (bluetooth){Signal=Serial.read();}//..sollen diese ausgelesen werden#
+  
+  if (Signal>-1 && Signal<80){
+    x0=Signal*scalexy;
+    x0=2./255.*x0-1.;
+  }
+  else if (Signal>79 && Signal<160){
+    y0=(Signal-80)*scalexy;
+    y0=-(2./255.*y0-1.);
+  }
+  else if (Signal>159 && Signal<240){
+    sollspeed=(Signal-160)*scale;
+  }
+  else if (Signal>239 && Signal<256){
+    analogWrite(GSMA, 0);
+    analogWrite(GSMB, 0);
+    analogWrite(GSMC, 0);
+  }
+  if (Signal<240) {
+  xy_to_spin(x0,y0,w_A,w_B,w_C);
+  w_max=max(max(w_A,w_B),w_C);
 
+  // sollspeedA=w_A/w_max*sollspeed;
+  // sollspeedB=w_B/w_max*sollspeed;
+  // sollspeedC=w_C/w_max*sollspeed;
+
+
+  
+  // pwmparamA=speedregulation(speedA,sollspeedA,pwmparamA,KpA);
+  
+
+  pwmA= pwm_func(sollspeedA, maxspeedA, pwmthresh,pwmparamA);
+  analogWrite(GSMA, max(min(pwmA,255),pwmthresh));
+  pwmB= pwm_func(sollspeedB, maxspeedB, pwmthresh,pwmparamB);
+  analogWrite(GSMB, max(min(pwmB,255),pwmthresh));
+  pwmC= pwm_func(sollspeedC, maxspeedC, pwmthresh,pwmparamC);
+  analogWrite(GSMC, max(min(pwmC,255),pwmthresh));
+
+  delay(2000);
+  speedA=get_speed(hallPinA,speedA,eval);
+  Serial.println(abs(sollspeedA-speedA));
+  
+
+  // pwmparamB=speedregulation(speedB,sollspeedB,pwmparamB,KpB);
+
+  speedB=get_speed(hallPinB,speedB,eval);
+  Serial.println(abs(sollspeedB-speedB));
+
+  // pwmparamC=speedregulation(speedC,sollspeedC,pwmparamC,KpC);
+
+  speedC=get_speed(hallPinC,speedC,eval);
+  Serial.println(abs(sollspeedC-speedC));
+
+  sollspeedA= min(sollspeedA+100.,maxspeedA);
+  sollspeedB= min(sollspeedB+100.,maxspeedB);
+  sollspeedC= min(sollspeedC+100.,maxspeedC);
+
+  
+  // 
+  // Serial.println("---");
+  // Serial.println(pwmparamA);
+  // Serial.println(pwmparamB);
+  // Serial.println(pwmparamC);
+  // Serial.println("---");
+  // Serial.println(speedA);
   // Serial.println(speedB);
+  // Serial.println(speedC);
 
-  //cumsum=(cumsum*(count-1)+speedB)/count;
-  // Serial.println(cumsum);
-  // Serial.println(cumsum);
-  // delay(100);
-
-  int analog_value = analogRead(10);
-  input_voltage = (analog_value * 5.0) / 1024.0; 
-  Serial.println(analog_value);
-  delay(500);
-
-}
+  
+  
   
 
 
-void det_power_speed_pair(int power,int GSM,int hallPin, float speed){
-    analogWrite(GSM, power);
-    delay(1000);
-    speed=get_speed(hallPin,speed);
-    output=String(power)+";"+String(speed);
-    Serial.println(output);
-    //Serial.println(output);
-    
+
+  
+  
+  Serial.println("---");
+  }
+}
+  
+
+float speedregulation(float speed, float sollspeed, float pwmparam,float Kp){
+  float delta;
+  delta=Kp*(sollspeed-speed);
+  if(abs(delta)>0.1){delta=0.1*delta/abs(delta);}
+  //if(abs(delta)<0.001){delta=0.;}
+  pwmparam=max(pwmparam+delta,0);
+  return pwmparam;
 }
 
-
-float get_speed(int hallPin, float speedold){
+float get_speed(int hallPin, float speedold, int eval){
   int val=0;
   bool on_state=false;
   float speed = 0.;
   float start = millis();
   //digitalWrite(LED_BUILTIN,HIGH);
-  while (val<40){
+  while (val<eval){
     //digitalWrite(LED_BUILTIN,digitalRead(hallPin));
     //if ((millis()-start)>700){break;}
     if (digitalRead(hallPin)==0){
@@ -201,33 +251,106 @@ float get_speed(int hallPin, float speedold){
   float stop = millis();
   float time=(stop-start)/1000.;
   speed=val/time*60;
-
-  // if(time>=10.){speed=speedold;}
-  // else{speed=val/time*60;}
   return speed;
-
 }
 
-float speed_polynomial(float speed, float m[3],float b[3],float spannung){
-  float q2;
-  float q1;
-  float q0;
-  float lsg1;
-  float lsg2;
-  q2=m[0]*spannung+b[0];
-  q1=m[1]*spannung+b[1];
-  q0=m[2]*spannung+b[2]-speed;
-  // Serial.println(q2);
-  // Serial.println(q1);
-  // Serial.println(q0);
-
-  lsg1=(-q1+sqrt(q1*q1-4.*q2*q0))/(2.*q2);
-  lsg2=(-q1-sqrt(q1*q1-4.*q2*q0))/(2.*q2);
-  //return q2*power*power+q1*power+q0;
-  return lsg1;
+float motorkurve( float m, float spannung){
+  return spannung*m;
 }
 
 
+float pwm_func(float sollspeed, float maxspeed, float pwmthresh,float pwmparam){
+  float pwm;
+  float x;
+  x=min(sollspeed/maxspeed,0.999);
+  pwm=pwmthresh-pwmparam*log(1.-x); 
+  return pwm;
+}
+
+float get_voltage(float spannungold){
+  float spannung=0.;
+  int analog_value;
+  float output_voltage;
+  float input_voltage;
+  float R1=9860.;
+  float R2=991.;
+   for (int i = 1; i < 10; i+=1){
+    analog_value = analogRead(A1);
+    input_voltage = (analog_value * 4.56) / 1023.0 ;
+
+    // /R2=991
+    // /R1=9860 
+    output_voltage = (input_voltage * (R1+R2)/R2) ; // Reduktion der Spannung  durch Spannungsteiler U2=U1*R2/R1
+    spannung=(spannung*float((i-1))+output_voltage)/float(i);
+    }
+  
+  //Serial.println(spannung);
+  //if (abs(spannungold-spannung)>0.5) {return spannung;}
+  return spannung;
+  //return spannungold;
+}
+
+// void speedcontrol(int hallPin, speed,sollspeed,pwm){
+//     while (true){
+//       speed=get_speed(hallPin,speed);
+//       pwmparam=speedregulation(speed,sollspeed,pwmparam,Kp);
+//     }    
+// }
+
+void xy_to_spin(float x0,float y0,float &w_A,float &w_B,float &w_C){
+    float pi = 3.1415926535897932384626433832795;
+    float alpha0 = 0.;
+    float alpha_tilde = 0.;
+    float r_i = 0.;
+
+    alpha_tilde = atan(abs(x0) / abs(y0)) / pi * 180.; // in Dummy Winkel umrechnen [deg]
+    r_i = min(1.,sqrt(x0*x0 + y0*y0)); // in Radius umrechnen
+
+
+    if (x0 >= 0 && y0 >= 0){ // Sektor 1
+
+      alpha0 = alpha_tilde; // in realen Winkel umrechnen (von y-Achse im Uhrzeigersinn) [deg]
+    }
+    else if( x0 >= 0 && y0 < 0){ // Sektor 2
+
+      alpha0 = 180. - alpha_tilde; // in realen Winkel umrechnen (von y-Achse im Uhrzeigersinn) [deg]
+    }
+    else if (x0 < 0 && y0 < 0){ // Sektor 3
+
+      alpha0 = alpha_tilde + 180.; // in realen Winkel umrechnen (von y-Achse im Uhrzeigersinn) [deg]
+    }
+    else {// Sektor 4
+
+      alpha0 = 360. - alpha_tilde; // in realen Winkel umrechnen (von y-Achse im Uhrzeigersinn) [deg]
+    }
+
+    if (alpha0 >= 0. && alpha0 < 120.){ // Zwischen Motor A und B
+
+      w_A = 0.5 + 0.5 * cos((1.5 * (alpha0 - 0.)) * pi / 180.); // Anteil Motor A bei r = r_max
+      w_B = 0.5 + 0.5 * cos((1.5 * (alpha0 - 120.)) * pi / 180.); // Anteil Motor B bei r = r_max
+      w_C =  max(0.,1. - w_A - w_B); // Anteil Motor C bei r = r_max
+    }
+    else if (alpha0 >= 120. && alpha0 < 240.){ // Zwischen Motor B und C
+
+      w_B = 0.5 + 0.5 * cos((1.5 * (alpha0 - 120.)) * pi / 180.); // Anteil Motor B bei r = r_max
+      w_C = 0.5 + 0.5 * cos((1.5 * (alpha0 - 240.)) * pi / 180.); // Anteil Motor C bei r = r_max
+      w_A = max(0.,1. - w_B - w_C); // Anteil Motor A bei r = r_max
+    }
+    else{  // Zwischen Motor C und A
+
+      w_A = 0.5 + 0.5 * cos((1.5 * (alpha0 - 360.)) * pi / 180.); // Anteil Motor A bei r = r_max
+      w_C = 0.5 + 0.5 * cos((1.5 * (alpha0 - 240.)) * pi / 180.); // Anteil Motor C bei r = r_max
+      w_B =  max(0.,1. - w_A - w_C); // Anteil Motor B bei r = r_max
+    }
+
+    w_A = w_A / (w_A + w_B + w_C);
+    w_B = w_B / (w_A + w_B + w_C);
+    w_C = w_C / (w_A + w_B + w_C);
+
+    w_A = (w_A - 1./3.) * r_i + 1./3.; // Anteil Motor A bei r = r_i
+    w_B = (w_B - 1./3.) * r_i + 1./3.; // Anteil Motor B bei r = r_i
+    w_C = (w_C - 1./3.) * r_i + 1./3.; // Anteil Motor C bei r = r_i
+}
 
 
 
