@@ -1,3 +1,5 @@
+
+
 // Pins für Motoren und Hall Sensoren
 //Motor A
 // #include "PinChangeInterrupt.h"
@@ -20,7 +22,7 @@ float w_max = 1.;
 float scalexy= 255./80.;
 
 //pwmfunktion
-int pwmthresh=100;
+int pwmthresh=50;
 
 float pwmA = pwmthresh;
 float pwmB = pwmthresh;
@@ -30,28 +32,20 @@ float pwmerrA=0;
 float pwmerrB=0;
 float pwmerrC=0;
 
-
-float mA =336.9398575;
-float mB =343.3361823;
-float mC =345.231468;
-
-
-float pwmparamA =0.1711*255.;
-
-float pwmparamB =0.1354*255.;
-
-float pwmparamC =0.1914*255.;
+float pwmparamA=0;
+float pwmparamB=0;
+float pwmparamC=0;
 
 
-float KpA =0.00006;
-float KpB =0.00006;
-float KpC =0.00006;
 
-float spannung;
+int readyA=0;
+int readyB=0;
+int readyC=0;
+
 
 //Bluetooth
 int Signal = -1;
-bool bluetooth=false;
+bool bluetooth=true;
 
 // Drehzahlvariablen
 float maxspeed = 10000.;
@@ -59,31 +53,56 @@ float maxspeedA = 1000.;
 float maxspeedB = 1000.;
 float maxspeedC = 1000.;
 
-float sollspeed = 1000.;
-float sollspeedA = 1000.;
-float sollspeedB = 1000.;
-float sollspeedC = 1000.;
+float Power = 1.;
+float sollspeedA = 2000.;
+float sollspeedB = 1200.;
+float sollspeedC = 1400.;
 
-float scale= maxspeed/80.;
+float scale;
+
 
 float speedA = 1000.;
 float speedB = 1000.;
 float speedC = 1000.;
 
-int nMess = 6;
+const int nMess = 10;
 int delta;
-int pwmtest;
-int evaltest= 100;
-int eval= 100;
 
-int readyA=0;
-int readyB=0;
-int readyC=0;
 
-int pwmthreshA=pwmthresh;
-int pwmthreshB=pwmthresh;
-int pwmthreshC=pwmthresh;
-volatile int valA=0;
+float pwmtest[nMess];
+
+float speedtestA[nMess];
+float speedtestB[nMess];
+float speedtestC[nMess];
+
+
+float pwminterp[nMess+2];
+
+float speedinterpA[nMess+2];
+float speedinterpB[nMess+2];
+float speedinterpC[nMess+2];
+
+
+
+float xtestA[nMess];
+float xtestB[nMess];
+float xtestC[nMess];
+
+
+float pwmparamtestA[nMess-1];
+float pwmparamtestB[nMess-1];
+float pwmparamtestC[nMess-1];
+
+float pwmthreshtestA[nMess-1];
+float pwmthreshtestB[nMess-1];
+float pwmthreshtestC[nMess-1];
+
+
+
+
+float pwmthreshA=30.;
+float pwmthreshB=30.;
+float pwmthreshC=30.;
 
 
 volatile long LastTimeWeMeasuredA=-1;  // Stores the last time we measured a pulse so we can calculate the period.
@@ -112,15 +131,12 @@ volatile unsigned int AmountOfReadingsA = 4;
 volatile unsigned int AmountOfReadingsB = 4;
 volatile unsigned int AmountOfReadingsC = 4;
 
-///
-
-
-
-
-
+float weight;
 void setup()
 {
-  Serial.begin(9600);  //serieller Monitor wird gestartet, Baudrate auf 9600 festgelegt
+
+  Serial1.begin(9600);  //serieller Monitor wird gestartet, Baudrate auf 9600 festgelegt
+  
   //Motor 1
   pinMode(GSMA, OUTPUT);  
   //Motor 2
@@ -135,91 +151,220 @@ void setup()
   pinMode(hallPinC,INPUT_PULLUP);
   // pciSetup(hallPinC);
 
-  
-  analogWrite(GSMA, pwmthresh);
-  analogWrite(GSMB, pwmthresh);
-  analogWrite(GSMC, pwmthresh);
   attachInterrupt(digitalPinToInterrupt(hallPinA), Pulse_EventA, RISING);
   attachInterrupt(digitalPinToInterrupt(hallPinB), Pulse_EventB, RISING);
   attachInterrupt(digitalPinToInterrupt(hallPinC), Pulse_EventC, RISING);
-  // spannung= get_voltage(spannung);
-
-  // maxspeedA=motorkurve(mA,spannung);
-  // maxspeedB=motorkurve(mB,spannung);
-  // maxspeedC=motorkurve(mC,spannung);
-  // attachInterrupt(digitalPinToInterrupt(hallPinA), Pulse_Event, RISING);
-  // attachInterrupt(digitalPinToInterrupt(hallPinB), Pulse_Event, RISING);
-  // delay(1000);  // We sometimes take several readings of the period to average. Since we don't have any readings
-  //               // stored we need a high enough value in micros() so if divided is not going to give negative values.
-  //               // The delay allows the micros() to be high enough for the first few cycles.
   
   
-  scale=maxspeedA/80.;
-  // pwmthresh=1.2/spannung*255;
-  delta = floor((255.-pwmthresh)/(nMess+1.));
+  
 
-  // for (int i = pwmthresh+delta; i > 0; i-=1){
-  //   analogWrite(GSMA,i);
-  //   analogWrite(GSMB,i);
-  //   analogWrite(GSMC,i);
-  //   delay(100);
-  //   if (readyA==0){ if ( not when_on_final(hallPinA) ) { pwmthreshA=i; readyA=1;};}
-  //   readyB=1;
-  //   readyC=1;
-  //   // if (readyB==0){ if ( not when_on(hallPinB) ) { pwmthreshB=i; readyB=1;};}
-  //   // if (readyC==0){ if ( not when_on(hallPinC) ) { pwmthreshC=i; readyC=1;};}
-  //   if ((readyA + readyB + readyC)==3){break;}
+
+  analogWrite(GSMA,255);
+  analogWrite(GSMB,255);
+  analogWrite(GSMC,255);
+  delay(2000);
+  maxspeedA=get_speed_final(hallPinA);
+  maxspeedB=get_speed_final(hallPinB);
+  maxspeedC=get_speed_final(hallPinC);
+  
+  scale=1./80.;
+
+  pretty_print(maxspeedA,maxspeedB,maxspeedC,"MAX");
+  pwminterp[nMess+1]=255.;
+  speedinterpA[nMess+1]=maxspeedA;
+  speedinterpB[nMess+1]=maxspeedB;
+  speedinterpC[nMess+1]=maxspeedC;
+  
+  delta = (255.-30.)/(float(nMess)+1.);
+  for (int i = 0; i < nMess; i+=1){
     
-  // }
-  //   SerialUSB.println(pwmthreshA);
-  //   SerialUSB.println(pwmthreshB);
-  //   SerialUSB.println(pwmthreshC);
-
-  pwmthreshA=24;
-  pwmthreshB=31;
-  pwmthreshC=23;
-
-    analogWrite(GSMA,255);
-    analogWrite(GSMB,255);
-    analogWrite(GSMC,255);
-    delay(2000);
-    maxspeedA=get_speed_final(hallPinA);
-    maxspeedB=get_speed_final(hallPinB);
-    maxspeedC=get_speed_final(hallPinC);
-
-    SerialUSB.println("+++");
-    SerialUSB.println(maxspeedA);
-    SerialUSB.println(maxspeedB);
-    SerialUSB.println(maxspeedC);
-    SerialUSB.println("+++");
-
-  for (int i = 1; i < nMess+1; i+=1){
-    pwmtest=floor(255-delta*i);
-    SerialUSB.println(pwmtest);
-    analogWrite(GSMA,pwmtest);
-    analogWrite(GSMB,pwmtest);
-    analogWrite(GSMC,pwmtest);
+    weight=1-float(i)/float(nMess);
+    delta=exp((1-weight)*log(255.)+(weight)*log(30.));
+    // delta=exp((log(255.)-log(30.))/(float(nMess)+1.)*float(nMess-i));
+    pwmtest[i]=delta;
+    pwminterp[i+1]=pwmtest[i];
+    analogWrite(GSMA,pwmtest[i]);
+    analogWrite(GSMB,pwmtest[i]);
+    analogWrite(GSMC,pwmtest[i]);
     delay(2000);
     speedA=get_speed_final(hallPinA);
     speedB=get_speed_final(hallPinB);
     speedC=get_speed_final(hallPinC);
-    while (speedA>maxspeedA){speedA=get_speed_final(hallPinA);}
-    while (speedB>maxspeedB){speedB=get_speed_final(hallPinB);}
-    while (speedC>maxspeedC){speedC=get_speed_final(hallPinC);}
+    // while (speedA>maxspeedA){speedA=get_speed_final(hallPinA);}
+    // while (speedB>maxspeedB){speedB=get_speed_final(hallPinB);}
+    // while (speedC>maxspeedC){speedC=get_speed_final(hallPinC);}
+
+    speedtestA[i]=speedA;
+    speedtestB[i]=speedB;
+    speedtestC[i]=speedC;
+
+    speedinterpA[i+1]=speedtestA[i];
+    speedinterpB[i+1]=speedtestB[i];
+    speedinterpC[i+1]=speedtestC[i];
+
+    xtestA[i]=log(1-speedtestA[i]/maxspeedA);
+    xtestB[i]=log(1-speedtestB[i]/maxspeedB);
+    xtestC[i]=log(1-speedtestC[i]/maxspeedC);
+
+    if (i>0){
+      pwmparamtestA[i-1]=-(pwmtest[i]-pwmtest[i-1])/(xtestA[i]-xtestA[i-1]);
+      pwmparamtestB[i-1]=-(pwmtest[i]-pwmtest[i-1])/(xtestB[i]-xtestB[i-1]);
+      pwmparamtestC[i-1]=-(pwmtest[i]-pwmtest[i-1])/(xtestC[i]-xtestC[i-1]);
+
+      pwmparamA=(pwmparamA*float(i-1)+pwmparamtestA[i-1])/float(i);
+      pwmparamB=(pwmparamB*float(i-1)+pwmparamtestB[i-1])/float(i);
+      pwmparamC=(pwmparamC*float(i-1)+pwmparamtestC[i-1])/float(i);
+      // pretty_print(pwmparamtestA[i-1],pwmparamtestB[i-1],pwmparamtestC[i-1],"PAR");
+
+
+      pwmthreshtestA[i-1]=pwmtest[i]+pwmparamtestA[i-1]*xtestA[i];
+      pwmthreshtestB[i-1]=pwmtest[i]+pwmparamtestB[i-1]*xtestB[i];
+      pwmthreshtestC[i-1]=pwmtest[i]+pwmparamtestC[i-1]*xtestC[i];
+
+      pwmthreshA=(pwmthreshA*float(i-1)+pwmthreshtestA[i-1])/float(i);
+      pwmthreshB=(pwmthreshB*float(i-1)+pwmthreshtestB[i-1])/float(i);
+      pwmthreshC=(pwmthreshC*float(i-1)+pwmthreshtestC[i-1])/float(i);
+      // pretty_print(pwmthreshtestA[i-1],pwmthreshtestB[i-1],pwmthreshtestC[i-1],"THR");
+    }
+
+    // pwmparamA=(pwmparamA*(float(i-1))-(pwmtest[i]-pwmthreshA)/log(1-speedA/maxspeedA))/float(i);
+    // pwmparamB=(pwmparamB*(float(i-1))-(pwmtest[i]-pwmthreshB)/log(1-speedB/maxspeedB))/float(i);
+    // pwmparamC=(pwmparamC*(float(i-1))-(pwmtest[i]-pwmthreshC)/log(1-speedC/maxspeedC))/float(i);
+
+    // pwmthreshA=pwmthreshA*(float(i-1))-log(1-speedA/maxspeedA)*);
+
+
+
+    // pwmthreshA=(pwmparamA*(float(i-1))-(pwmtest-pwmthreshA)/log(1-speedA/maxspeedA))/float(i);
+    // pwmthreshB=(pwmparamB*(float(i-1))-(pwmtest-pwmthreshB)/log(1-speedB/maxspeedB))/float(i);
+    // pwmthreshC=(pwmparamC*(float(i-1))-(pwmtest-pwmthreshC)/log(1-speedC/maxspeedC))/float(i);
+
+    
+  }
+    // pwmthresh=(pwmthreshA+pwmthreshB+pwmthreshC)/3.;
+    // analogWrite(GSMA,pwmthresh+20);
+    // analogWrite(GSMB,pwmthresh+20);
+    // analogWrite(GSMC,pwmthresh+20);
+
+
+    analogWrite(GSMA,30);
+    analogWrite(GSMB,30);
+    analogWrite(GSMC,30);
+    delay(2000);
+    speedA=get_speed_final(hallPinA);
+    speedB=get_speed_final(hallPinB);
+    speedC=get_speed_final(hallPinC);
+    pwminterp[0]=30.;
+    
+    speedinterpA[0]=speedA;
+    speedinterpB[0]=speedB;
+    speedinterpC[0]=speedC;
+
+
+    // pwmthreshA=pwmthreshA+20+pwmparamA*log(1-speedA/maxspeedA);
+    // pwmthreshB=pwmthreshB+20+pwmparamB*log(1-speedB/maxspeedB);
+    // pwmthreshC=pwmthreshC+20+pwmparamC*log(1-speedC/maxspeedC);\
+  
+    pretty_print(pwmparamA,pwmparamB,pwmparamC,"PAR");
+    pretty_print(pwmthreshA,pwmthreshB,pwmthreshC,"THR");
+
+
+    // pwmtest1=floor(50);
+    // // SerialUSB.println(pwmtest);
+    // analogWrite(GSMA,pwmtest1);
+    // analogWrite(GSMB,pwmtest1);
+    // analogWrite(GSMC,pwmtest1);
+    // delay(1000);
+    // speedA1=get_speed_final(hallPinA);
+    // speedB1=get_speed_final(hallPinB);
+    // speedC1=get_speed_final(hallPinC);
+    
+    // pwmtest2=floor(200);
+    // // SerialUSB.println(pwmtest);
+    // analogWrite(GSMA,pwmtest2);
+    // analogWrite(GSMB,pwmtest2);
+    // analogWrite(GSMC,pwmtest2);
+    // delay(1000);
+    // speedA2=get_speed_final(hallPinA);
+    // speedB2=get_speed_final(hallPinB);
+    // speedC2=get_speed_final(hallPinC);
+
+    // SerialUSB.println("+++");
+    // SerialUSB.println(speedA2);
+    // SerialUSB.println(speedB2);
+    // SerialUSB.println(speedC2);
+    // SerialUSB.println("+++");
+
+    // xA1=log(1-speedA1/maxspeedA);
+    // xB1=log(1-speedB1/maxspeedB);
+    // xC1=log(1-speedC1/maxspeedC);
+
+    // yA1=pwmtest1;
+    // yB1=pwmtest1;
+    // yC1=pwmtest1;
+
+
+    
+    // xA2=log(1-speedA2/maxspeedA);
+    // xB2=log(1-speedB2/maxspeedB);
+    // xC2=log(1-speedC2/maxspeedC);
+
+    // yA2=pwmtest2;
+    // yB2=pwmtest2;
+    // yC2=pwmtest2;
+
+    // bA=(yA2-yA1)/(xA2-xA1);
+    // aA=yA1-xA1*bA;
+
+    // bB=(yB2-yB1)/(xB2-xB1);
+    // aB=yB1-xB1*bB;
+
+    // bC=(yC2-yC1)/(xC2-xC1);
+    // aC=yC1-xC1*bC;
+    // SerialUSB.println("threshes");
+    // SerialUSB.println(aA);
+    // SerialUSB.println(aB);
+    // SerialUSB.println(aC);
+    // SerialUSB.println("threshes");
+    // SerialUSB.println("Beees");
+    // SerialUSB.println(bA);
+    // SerialUSB.println(bB);
+    // SerialUSB.println(bC);
+    // SerialUSB.println("Beees");
+
+    // pwmparamA=-bA;
+    // pwmparamB=-bB;
+    // pwmparamC=-bC;
+
+    // pwmthreshA=aA;
+    // pwmthreshB=aB;
+    // pwmthreshC=aC;
+
+
+    // while (speedA>maxspeedA){speedA=get_speed_final(hallPinA);}
+    // while (speedB>maxspeedB){speedB=get_speed_final(hallPinB);}
+    // while (speedC>maxspeedC){speedC=get_speed_final(hallPinC);}
 
     // SerialUSB.println(-(pwmtest-pwmthreshA)/log(1-speedA/maxspeedA));
     // SerialUSB.println(-(pwmtest-pwmthreshB)/log(1-speedB/maxspeedB));
     // SerialUSB.println(-(pwmtest-pwmthreshC)/log(1-speedC/maxspeedC));
 
-    pwmparamA=(pwmparamA*(float(i-1))-(pwmtest-pwmthreshA)/log(1-speedA/maxspeedA))/float(i);
-    pwmparamB=(pwmparamB*(float(i-1))-(pwmtest-pwmthreshB)/log(1-speedB/maxspeedB))/float(i);
-    pwmparamC=(pwmparamC*(float(i-1))-(pwmtest-pwmthreshC)/log(1-speedC/maxspeedC))/float(i);
+    // pwmparamA=(pwmparamA*(float(i-1))-(pwmtest-pwmthreshA)/log(1-speedA/maxspeedA))/float(i);
+    // pwmparamB=(pwmparamB*(float(i-1))-(pwmtest-pwmthreshB)/log(1-speedB/maxspeedB))/float(i);
+    // pwmparamC=(pwmparamC*(float(i-1))-(pwmtest-pwmthreshC)/log(1-speedC/maxspeedC))/float(i);
+
+    // pwmthreshA=pwmthreshA*(float(i-1))-log(1-speedA/maxspeedA)*);
 
 
-    SerialUSB.println(pwmparamA);
-    SerialUSB.println(pwmparamB);
-    SerialUSB.println(pwmparamC);
-  }
+
+    // pwmthreshA=(pwmparamA*(float(i-1))-(pwmtest-pwmthreshA)/log(1-speedA/maxspeedA))/float(i);
+    // pwmthreshB=(pwmparamB*(float(i-1))-(pwmtest-pwmthreshB)/log(1-speedB/maxspeedB))/float(i);
+    // pwmthreshC=(pwmparamC*(float(i-1))-(pwmtest-pwmthreshC)/log(1-speedC/maxspeedC))/float(i);
+
+
+    // SerialUSB.println(pwmparamA);
+    // SerialUSB.println(pwmparamB);
+    // SerialUSB.println(pwmparamC);
 
   delay(1000);
   
@@ -227,37 +372,10 @@ void setup()
 }
 
 void loop(){
-  // SerialUSB.println("---");
-  //SerialUSB.println(spannung);
-  // delay(1000);
-  sollspeedA+=1;
-  sollspeedB+=1;
-  sollspeedC+=1;
 
-  speedA=get_speed_final(hallPinA);
-  speedB=get_speed_final(hallPinB);
-  speedC=get_speed_final(hallPinC);
-  // pwmA=speedregulation_final(speedA,sollspeedA,pwmA,0.00005);
-  pwmA= pwm_func(sollspeedA, maxspeedA, pwmthreshA,pwmparamA);
-  pwmB= pwm_func(sollspeedB, maxspeedB, pwmthreshB,pwmparamB);
-  pwmC= pwm_func(sollspeedC, maxspeedC, pwmthreshC,pwmparamC);
 
-  SerialUSB.println("!!!");
-  SerialUSB.println(pwmerrA);
-  SerialUSB.println(pwmerrB);
-  SerialUSB.println(pwmerrC);
-  SerialUSB.println("!!!");
-  pwmerrA=speedregulation_xerr(speedA,sollspeedA,pwmerrA,0.00005);
-  analogWrite(GSMA, max(min(pwmA+pwmerrA,255),pwmthreshA));
-  pwmerrB=speedregulation_xerr(speedB,sollspeedB,pwmerrB,0.00005);
-  analogWrite(GSMB, max(min(pwmB+pwmerrB,255),pwmthreshB));
-  pwmerrC=speedregulation_xerr(speedC,sollspeedC,pwmerrC,0.00005);
-  analogWrite(GSMC, max(min(pwmC+pwmerrC,255),pwmthreshC));
-  // speedB=get_speed_final(hallPinB);
-  // speedC=get_speed_final(hallPinC);
 
-  if (bluetooth){Signal=Serial.read();}//..sollen diese ausgelesen werden#
-  
+  if (bluetooth){Signal=Serial1.read();}//..sollen diese ausgelesen werden#
   if (Signal>-1 && Signal<80){
     x0=Signal*scalexy;
     x0=2./255.*x0-1.;
@@ -267,7 +385,7 @@ void loop(){
     z0=-(2./255.*z0-1.);
   }
   else if (Signal>159 && Signal<240){
-    sollspeed=(Signal-160)*scale;
+    Power=(Signal-160.)*scale;
   }
   else if (Signal>239 && Signal<256){
     analogWrite(GSMA, 0);
@@ -277,157 +395,76 @@ void loop(){
   if (Signal<240) {
   xy_to_spin(x0,z0,w_A,w_B,w_C);
   w_max=max(max(w_A,w_B),w_C);
+  // pretty_print(w_A,w_B,w_C,"weights");
+  sollspeedA=w_A/w_max*Power*maxspeedA;
+  sollspeedB=w_B/w_max*Power*maxspeedB;
+  sollspeedC=w_C/w_max*Power*maxspeedC;
+  // pretty_print(x0,z0,sollspeedC,"x0");
+  // pretty_print(sollspeedA,sollspeedB,sollspeedC,"SOL");
 
-  // sollspeedA=w_A/w_max*sollspeed;
-  // sollspeedB=w_B/w_max*sollspeed;
-  // sollspeedC=w_C/w_max*sollspeed;
-
-
-  
-  // pwmparamA=speedregulation(speedA,sollspeedA,pwmparamA,KpA);
-  
-
-  // speedA=get_speed_final(hallPinA);
-
-
-  // attachInterrupt(digitalPinToInterrupt(hallPinA), Pulse_Event, RISING);
-  // speedA=get_speed_final();
-  // detachInterrupt(digitalPinToInterrupt(hallPinA));
   // pwmA= pwm_func(sollspeedA, maxspeedA, pwmthreshA,pwmparamA);
-  // analogWrite(GSMA, max(min(pwmA,255),pwmthreshA));
   // pwmB= pwm_func(sollspeedB, maxspeedB, pwmthreshB,pwmparamB);
-  // analogWrite(GSMB, max(min(pwmB,255),pwmthreshB));
   // pwmC= pwm_func(sollspeedC, maxspeedC, pwmthreshC,pwmparamC);
-  // analogWrite(GSMC, max(min(pwmC,255),pwmthreshC));
 
-  // delay(2000);
-  // speedA=get_speed(hallPinA,speedA,eval);
-  // SerialUSB.println(abs(sollspeedA-speedA));
-  
-
-  // // pwmparamB=speedregulation(speedB,sollspeedB,pwmparamB,KpB);
-
-  // speedB=get_speed(hallPinB,speedB,eval);
-  // SerialUSB.println(speedB);
-  // SerialUSB.println(abs(sollspeedB-speedB));
-
-  // // pwmparamC=speedregulation(speedC,sollspeedC,pwmparamC,KpC);
-
-  // speedC=get_speed(hallPinC,speedC,eval);
-  // SerialUSB.println(abs(sollspeedC-speedC));
-
-  // sollspeedA= min(sollspeedA+100.,maxspeedA);
-  // sollspeedB= min(sollspeedB+100.,maxspeedB);
-  // sollspeedC= min(sollspeedC+100.,maxspeedC);
-
-  
-  // 
+  pwmA=pwl_value_1d(nMess+2,speedinterpA,pwminterp,sollspeedA);
+  pwmB=pwl_value_1d(nMess+2,speedinterpB,pwminterp,sollspeedB);
+  pwmC=pwl_value_1d(nMess+2,speedinterpC,pwminterp,sollspeedC);
+  analogWrite(GSMA, max(min(pwmA+pwmerrA,255),0));
+  analogWrite(GSMB, max(min(pwmB+pwmerrB,255),0));
+  analogWrite(GSMC, max(min(pwmC+pwmerrC,255),0));
+  // delay(100);
   // SerialUSB.println("---");
-  // SerialUSB.println(pwmparamA);
-  // SerialUSB.println(pwmparamB);
-  // SerialUSB.println(pwmparamC);
-  // SerialUSB.println("---");
-  // SerialUSB.println(speedA);
-  // SerialUSB.println(speedB);
-  // SerialUSB.println(speedC);
+  //SerialUSB.println(spannung);
+  // delay(1000);
+  // sollspeedA+=1;
+  // sollspeedB+=1;
+  // sollspeedC+=1;
+  // speedA=get_speed_final(hallPinA);
+  // while (abs(speedA-sollspeedA)>50.){
+  //   analogWrite(GSMA, max(min(pwmA+pwmerrA,255),0));
+  // speedA=get_speed_final(hallPinA);
+  // pwmerrA=speedregulation_xerr(speedA,sollspeedA,pwmerrA,0.000003);
+  // }
+  // while (abs(speedB-sollspeedB)>50.){
+  //   analogWrite(GSMB, max(min(pwmB+pwmerrB,255),0));
+  //   speedB=get_speed_final(hallPinB);
+  //   pwmerrB=speedregulation_xerr(speedB,sollspeedB,pwmerrB,0.000003);
+  // }
+  // while (abs(speedC-sollspeedC)>50.){
+  //   analogWrite(GSMC, max(min(pwmC+pwmerrC,255),0));
+  //   speedC=get_speed_final(hallPinC);
+  //   pwmerrC=speedregulation_xerr(speedC,sollspeedC,pwmerrC,0.000003);
+  // }
 
   
-  
-  
+  speedA=get_speed_final(hallPinA);
+  speedB=get_speed_final(hallPinB);
+  speedC=get_speed_final(hallPinC);
+  // pretty_print(speedA,speedB,speedC,"RPM");
+  pwmerrA=speedregulation_xerr(speedA,sollspeedA,pwmerrA,0.00005);
+  pwmerrB=speedregulation_xerr(speedB,sollspeedB,pwmerrB,0.00005);
+  pwmerrC=speedregulation_xerr(speedB,sollspeedB,pwmerrB,0.00005);
+  pretty_print(speedA-sollspeedA,speedB-sollspeedB,speedC-sollspeedC,"Soll-Ist");
 
-
-
-  
-  
-  // SerialUSB.println("---");
   }
 }
   
 
-float speedregulation_param(float speed, float sollspeed, float pwmparam,float Kp){
-  float delta;
-  delta=Kp*(sollspeed-speed);
-  if(abs(delta)>0.1){delta=0.1*delta/abs(delta);}
-  //if(abs(delta)<0.001){delta=0.;}
-  pwmparam=max(pwmparam+delta,0);
-  return pwmparam;
-} 
-
-float speedregulation_xerr(float speed, float sollspeed, float pwmerr,float Kp){
+float speedregulation_xerr(float speed, float sollspeed,float pwmerr ,float Kp){
   float delta;
   delta=Kp*(sollspeed-speed);
   // if(abs(delta)>0.1){delta=0.1*delta/abs(delta);}
-  pwmerr=max(pwmerr+delta,0);
+  pwmerr=pwmerr+delta;
   return pwmerr;
 } 
+// float speedregulation_yerr(float speed, float sollspeed,float pwmerr ,float Kp){
+//   float delta;
+//   delta=Kp*(sollspeed-speed);
+//   // if(abs(delta)>0.1){delta=0.1*delta/abs(delta);}
+//   pwmerr=pwmerr+delta;
+//   return pwmerr;
+// } 
 
-float speedregulation_final(float speed, float sollspeed, float pwm ,float Kp){
-  float delta;
-  delta=Kp*(sollspeed-speed);
-  // if(abs(delta)>0.1){delta=0.1*delta/abs(delta);}
-  //if(abs(delta)<0.001){delta=0.;}
-  pwm=min(max(pwm+delta,0.),255.);
-  return pwm;
-}
-
-float get_speed(int hallPin, float speedold, int eval){
-  int val=0;
-  bool on_state=false;
-  float speed = 0.;
-  float start = micros();
-  //digitalWrite(LED_BUILTIN,HIGH);
-  while (val<eval){
-    //digitalWrite(LED_BUILTIN,digitalRead(hallPin));
-    //if ((micros()-start)>700){break;}
-    if (digitalRead(hallPin)==0){
-      if (on_state==false){
-        on_state=true;
-        val+=1;
-        //digitalWrite(LED_BUILTIN,LOW);
-      }
-    }
-    else{
-      if (on_state==true){
-        on_state=false;
-        //digitalWrite(LED_BUILTIN,LOW);
-      }      
-    }
-  }
-  
-  float stop = micros();
-  float time=(stop-start)/1000000.;
-  speed=val/time*60;
-  return speed;
-}
-
-
-
-bool when_on(int hallPin){
-  int val=0;
-  bool on_state=false;
-  float start = micros();
-  while (true){
-    if ((micros()-start)>1000000){return false;}
-    if (val>2){return true;}
-    if (digitalRead(hallPin)==0){
-      if (on_state==false){
-        on_state=true;
-        val+=1;
-        start = micros();
-      }
-    }
-    else{
-      if (on_state==true){
-        on_state=false;
-      }      
-    }
-  }
-}
-
-
-float motorkurve( float m, float spannung){
-  return spannung*m;
-}
 
 
 float pwm_func(float sollspeed, float maxspeed, float pwmthresh,float pwmparam){
@@ -438,35 +475,7 @@ float pwm_func(float sollspeed, float maxspeed, float pwmthresh,float pwmparam){
   return pwm;
 }
 
-float get_voltage(float spannungold){
-  float spannung=0.;
-  int analog_value;
-  float output_voltage;
-  float input_voltage;
-  float R1=9860.;
-  float R2=991.;
-   for (int i = 1; i < 10; i+=1){
-    analog_value = analogRead(A1);
-    input_voltage = (analog_value * 4.56) / 1023.0 ;
 
-    // /R2=991
-    // /R1=9860 
-    output_voltage = (input_voltage * (R1+R2)/R2) ; // Reduktion der Spannung  durch Spannungsteiler U2=U1*R2/R1
-    spannung=(spannung*float((i-1))+output_voltage)/float(i);
-    }
-  
-  //SerialUSB.println(spannung);
-  //if (abs(spannungold-spannung)>0.5) {return spannung;}
-  return spannung;
-  //return spannungold;
-}
-
-// void speedcontrol(int hallPin, speed,sollspeed,pwm){
-//     while (true){
-//       speed=get_speed(hallPin,speed);
-//       pwmparam=speedregulation(speed,sollspeed,pwmparam,Kp);
-//     }    
-// }
 
 void xy_to_spin(float x0,float z0,float &w_A,float &w_B,float &w_C){
     float pi = 3.1415926535897932384626433832795;
@@ -533,49 +542,47 @@ float get_speed_final(int hallPin){
   noInterrupts();
   seconds=PeriodAverageA/1000000.;
   interrupts();
-  SerialUSB.print("\tMotor A: ");
+  // SerialUSB.print("\tMotor A: ");
   }
   else if (hallPin==hallPinB){
   noInterrupts();
   seconds=PeriodAverageB/1000000.;
   interrupts();
-  SerialUSB.print("\tMotor B: ");
+  // SerialUSB.print("\tMotor B: ");
   }
   else if (hallPin==hallPinC){
   noInterrupts();
   seconds=PeriodAverageC/1000000.;
   interrupts();
-  SerialUSB.print("\tMotor C: ");
+  // SerialUSB.print("\tMotor C: ");
   }
 
   float rpm=60./seconds/2.;
-  SerialUSB.print("\tRPM: ");
-  SerialUSB.print(rpm);
-  SerialUSB.print("\n");
+  // SerialUSB.print("\tMotor A: ");
+  // SerialUSB.print("\tRPM: ");
+  // SerialUSB.print(rpm);
+  // SerialUSB.print("\t");
   return rpm;
 }
 
-bool when_on_final(int hallPin){
-  bool  is_on;
-  if (hallPin==hallPinA){
-  noInterrupts();
-  is_on=PeriodSumA<200000 ;
-  interrupts();
-  }
-  if (hallPin==hallPinB){
-  noInterrupts();
-  is_on=PeriodSumB<200000 ;
-  interrupts();
-  }
-  if (hallPin==hallPinC){
-  noInterrupts();
-  is_on=PeriodSumC<200000 ;
-  interrupts();
-  }
-  return is_on;
+
+
+void pretty_print(float speedA,float speedB,float speedC, String unit){
+    SerialUSB.print("\tMotor A: ");
+    SerialUSB.print("\t"+unit+": ");
+    SerialUSB.print(speedA);
+    SerialUSB.print("\t");
+    SerialUSB.print("\tMotor B: ");
+    SerialUSB.print("\t"+unit+": ");
+    SerialUSB.print(speedB);
+    SerialUSB.print("\t");
+    SerialUSB.print("\tMotor C: ");
+    SerialUSB.print("\t"+unit+": ");
+    SerialUSB.print(speedC);
+    SerialUSB.println("\t");
+
 }
 
- 
 void Pulse_EventA()  // The interrupt runs this to calculate the period between pulses:
 {
   if (LastTimeWeMeasuredA==-1){
@@ -666,3 +673,40 @@ void Pulse_EventC()  // The interrupt runs this to calculate the period between 
   }
 
 }  // End of Pulse_Event.
+
+
+float pwl_value_1d( int nd, float xd[], float yd[], float xi )
+{
+  int i;
+  int k;
+  float t;
+
+  float yi;
+
+  yi = 0.0;
+
+    if ( xi <= xd[0] )
+    {
+      t = ( xi - xd[0] ) / ( xd[1] - xd[0] );
+      yi = ( 1.0 - t ) * yd[0] + t * yd[1];
+    }
+    else if ( xd[nd-1] <= xi )
+    {
+      t = ( xi - xd[nd-2] ) / ( xd[nd-1] - xd[nd-2] );
+      yi = ( 1.0 - t ) * yd[nd-2] + t * yd[nd-1];
+    }
+    else
+    {
+      for ( k = 1; k < nd; k++ )
+      {
+        if ( xd[k-1] <= xi && xi <= xd[k] )
+        {
+          t = ( xi - xd[k-1] ) / ( xd[k] - xd[k-1] );
+          yi = ( 1.0 - t ) * yd[k-1] + t * yd[k];
+          break;
+        }
+      }
+    }
+  return yi;
+}
+
