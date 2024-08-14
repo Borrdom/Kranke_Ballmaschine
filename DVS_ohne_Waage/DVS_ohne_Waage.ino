@@ -4,9 +4,11 @@
 
 #define DHTTYPE DHT22    // Es handelt sich um den DHT22 Sensor
 int out = 9;
-int fan = 8;
+int fan = 10;
 bool humidifier_on=false;
 float RH;
+float RHsoll=90;
+float error;
 
 
 DHT dht(DHTPIN, DHTTYPE); //Der Sensor wird ab jetzt mit „dth“ angesprochen
@@ -17,27 +19,40 @@ void setup() {
   pinMode(fan, OUTPUT);
   dht.begin(); //DHT22 Sensor starten
   digitalWrite(out,HIGH); // The digital in out starts HIGH to simulate that the button of the humidifier module is unpressed.
-  analogWrite(fan,0);
 }
 
 void loop() {
   delay(1000);
   RH = dht.readHumidity();
-  if (humidifier_on && RH>84.){
+  error=RH-RHsoll;
+  if (humidifier_on && RH>(RHsoll-2)){
     deactive_humidifier();
     humidifier_on=false;
-    active_fan();
   }
-  if (!humidifier_on && RH<=86.){
+  if (!humidifier_on && RH<=(RHsoll-2)){
     active_humidifier();
     humidifier_on=true;
     deactive_fan();
   }
+
+  if (RH>(RHsoll+0.5)){
+    active_fan();
+    delay(200);
+    deactive_fan();
+  }
+
+  if (RH>(RHsoll+10)){
+    active_fan();
+    delay(2000);
+    deactive_fan();
+  }
+
+
   // float Temperatur = dht.readTemperature();//die Temperatur auslesen und unter „Temperatur“ speichern
 
   Serial.println(RH); //die Dazugehörigen Werte anzeigen
 
-  // analogWrite(fan,255);
+
 }
 
 void active_humidifier(){
@@ -65,15 +80,24 @@ void deactive_humidifier(){
 void active_fan(){
   delay(50);
   analogWrite(fan,255);
-  // analogWrite(fan,255);
   delay(50);
   analogWrite(fan,0);
-    delay(50);
+  delay(50);
   analogWrite(fan,255);
-    delay(50);
-  analogWrite(fan,0);
-    delay(50);
+  delay(50);
   analogWrite(fan,255);
+
+  // delay(50);
+  // analogWrite(fan,255);
+  // analogWrite(fan,255);
+//   delay(50);
+//   analogWrite(fan,0);
+//     delay(50);
+//   analogWrite(fan,255);
+//     delay(50);
+//   analogWrite(fan,0);
+//     delay(50);
+//   analogWrite(fan,255);
 }
 void deactive_fan(){
   delay(50);
